@@ -1,0 +1,58 @@
+# OS Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Build artifacts
+build/
+dist/
+*.zip
+*.tar.gz
+
+# Hardware design files (large binaries)
+*.brd.bak
+*.sch.bak
+*.kicad_pcb-bak
+*.kicad_sch-bak
+
+# CAD cache
+*.lck
+~$*
+
+# Gerber generation
+gerber_temp/
+
+# Documentation builds
+_site/
+.jekyll-cache/
+
+# Secrets
+.env
+secrets.yml
+*.key
+*.pem
+
+# Large files (use Git LFS if needed)
+*.pdf
+*.step
+*.stp
+*.stl
+# Uncomment if you want to track these:
+# !docs/**/*.pdf

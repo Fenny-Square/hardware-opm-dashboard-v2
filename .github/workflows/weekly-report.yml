@@ -1,0 +1,146 @@
+name: Weekly Program Status Report
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * MON'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Generate Weekly Report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            // Get open issues
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+            
+            // Get closed issues from last week
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            
+            const { data: closedIssues } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              state: 'closed',
+              since: oneWeekAgo.toISOString(),
+              per_page: 100
+            });
+            
+            // Categorize issues by label
+            const categorize = (issues) => {
+              const categories = {
+                hardware: [],
+                design: [],
+                testing: [],
+                bug: [],
+                other: []
+              };
+              
+              issues.forEach(issue => {
+                const labels = issue.labels.map(l => l.name);
+                if (labels.includes('hardware')) categories.hardware.push(issue);
+                else if (labels.includes('design')) categories.design.push(issue);
+                else if (labels.includes('testing')) categories.testing.push(issue);
+                else if (labels.includes('bug')) categories.bug.push(issue);
+                else categories.other.push(issue);
+              });
+              
+              return categories;
+            };
+            
+            const openCategories = categorize(openIssues);
+            const closedCategories = categorize(closedIssues);
+            
+            // Generate report
+            let report = `# 📊 Weekly Program Status Report\n\n`;
+            report += `**Report Date:** ${new Date().toLocaleDateString()}\n\n`;
+            report += `---\n\n`;
+            
+            report += `## 📈 Summary\n\n`;
+            report += `- **Open Issues:** ${openIssues.length}\n`;
+            report += `- **Closed This Week:** ${closedIssues.length}\n`;
+            report += `- **Hardware Issues:** ${openCategories.hardware.length}\n`;
+            report += `- **Design Tasks:** ${openCategories.design.length}\n`;
+            report += `- **Testing:** ${openCategories.testing.length}\n`;
+            report += `- **Bugs:** ${openCategories.bug.length}\n\n`;
+            
+            report += `---\n\n`;
+            
+            report += `## 🔴 Critical Open Issues\n\n`;
+            const criticalIssues = openIssues.filter(i => 
+              i.labels.some(l => l.name.toLowerCase().includes('critical'))
+            );
+            
+            if (criticalIssues.length === 0) {
+              report += `No critical issues 🎉\n\n`;
+            } else {
+              criticalIssues.forEach(issue => {
+                report += `- [#${issue.number}](${issue.html_url}) ${issue.title}\n`;
+              });
+              report += `\n`;
+            }
+            
+            report += `---\n\n`;
+            
+            report += `## ✅ Completed This Week\n\n`;
+            if (closedIssues.length === 0) {
+              report += `No issues closed this week.\n\n`;
+            } else {
+              closedIssues.slice(0, 10).forEach(issue => {
+                report += `- [#${issue.number}](${issue.html_url}) ${issue.title}\n`;
+              });
+              if (closedIssues.length > 10) {
+                report += `\n_... and ${closedIssues.length - 10} more_\n`;
+              }
+              report += `\n`;
+            }
+            
+            report += `---\n\n`;
+            
+            report += `## 🔧 Hardware Status\n\n`;
+            if (openCategories.hardware.length === 0) {
+              report += `No open hardware issues.\n\n`;
+            } else {
+              openCategories.hardware.slice(0, 5).forEach(issue => {
+                report += `- [#${issue.number}](${issue.html_url}) ${issue.title}\n`;
+              });
+              if (openCategories.hardware.length > 5) {
+                report += `\n_... and ${openCategories.hardware.length - 5} more_\n`;
+              }
+              report += `\n`;
+            }
+            
+            report += `---\n\n`;
+            report += `## 🔗 Links\n\n`;
+            report += `- [View All Open Issues](https://github.com/${owner}/${repo}/issues)\n`;
+            report += `- [Project Board](https://github.com/${owner}/${repo}/projects)\n`;
+            report += `- [Program Dashboard](https://${owner}.github.io/${repo})\n\n`;
+            
+            console.log(report);
+            
+            // Create an issue with the report
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: `📊 Weekly Status Report - ${new Date().toLocaleDateString()}`,
+              body: report,
+              labels: ['report', 'weekly-status']
+            });
+            
+            core.summary.addRaw(report);
+            await core.summary.write();
